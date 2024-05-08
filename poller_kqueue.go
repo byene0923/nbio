@@ -126,7 +126,7 @@ func (p *poller) trigger() {
 
 func (p *poller) addRead(fd int) {
 	p.mux.Lock()
-	p.eventList = append(p.eventList, syscall.Kevent_t{Ident: uint64(fd), Flags: syscall.EV_ADD, Filter: syscall.EVFILT_READ})
+	p.eventList = append(p.eventList, syscall.Kevent_t{Ident: uint64(fd), Flags: syscall.EV_ADD | syscall.EV_ENABLE, Filter: syscall.EVFILT_READ})
 	// p.eventList = append(p.eventList, syscall.Kevent_t{Ident: uint64(fd), Flags: syscall.EV_ADD, Filter: syscall.EVFILT_WRITE})
 	p.mux.Unlock()
 	p.trigger()
@@ -141,15 +141,15 @@ func (p *poller) resetRead(fd int) {
 
 func (p *poller) modWrite(fd int) {
 	p.mux.Lock()
-	p.eventList = append(p.eventList, syscall.Kevent_t{Ident: uint64(fd), Flags: syscall.EV_ADD, Filter: syscall.EVFILT_WRITE})
+	p.eventList = append(p.eventList, syscall.Kevent_t{Ident: uint64(fd), Flags: syscall.EV_ADD | syscall.EV_ENABLE, Filter: syscall.EVFILT_WRITE})
 	p.mux.Unlock()
 	p.trigger()
 }
 
 func (p *poller) addReadWrite(fd int) {
 	p.mux.Lock()
-	p.eventList = append(p.eventList, syscall.Kevent_t{Ident: uint64(fd), Flags: syscall.EV_ADD, Filter: syscall.EVFILT_READ})
-	p.eventList = append(p.eventList, syscall.Kevent_t{Ident: uint64(fd), Flags: syscall.EV_ADD, Filter: syscall.EVFILT_WRITE})
+	p.eventList = append(p.eventList, syscall.Kevent_t{Ident: uint64(fd), Flags: syscall.EV_ADD | syscall.EV_ENABLE, Filter: syscall.EVFILT_READ})
+	p.eventList = append(p.eventList, syscall.Kevent_t{Ident: uint64(fd), Flags: syscall.EV_ADD | syscall.EV_ENABLE, Filter: syscall.EVFILT_WRITE})
 	p.mux.Unlock()
 	p.trigger()
 }
@@ -170,7 +170,7 @@ func (p *poller) readWrite(ev *syscall.Kevent_t) {
 	fd := int(ev.Ident)
 	c := p.getConn(fd)
 	if c != nil {
-		if ev.Filter == syscall.EVFILT_READ {
+		if ev.Filter == syscall.EVFILT_READ && ev.Filter&syscall.EV_ENABLE > 0 {
 			if p.g.onRead == nil {
 				for {
 					buffer := p.g.borrow(c)
@@ -210,7 +210,7 @@ func (p *poller) readWrite(ev *syscall.Kevent_t) {
 			}
 		}
 
-		if ev.Filter == syscall.EVFILT_WRITE {
+		if ev.Filter == syscall.EVFILT_WRITE && ev.Filter&syscall.EV_ENABLE > 0 {
 			if c.onConnected == nil {
 				c.flush()
 			} else {
